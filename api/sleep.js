@@ -3,7 +3,7 @@ const db = require('./_db.js');
 module.exports = function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -14,9 +14,10 @@ module.exports = function handler(req, res) {
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
     const id = url.searchParams.get('id') || url.searchParams.get('date');
+    const userId = db.getUserIdFromRequest(req);
 
     if (req.method === 'GET') {
-      const logs = db.getSleepLogs(startDate, endDate);
+      const logs = db.getSleepLogs(userId, startDate, endDate);
       return res.status(200).json({ success: true, data: logs });
     }
 
@@ -25,7 +26,7 @@ module.exports = function handler(req, res) {
       if (!body.date) {
         return res.status(400).json({ success: false, error: 'Sleep date is required' });
       }
-      const saved = db.saveSleepLog(body);
+      const saved = db.saveSleepLog(userId, body);
       return res.status(200).json({ success: true, data: saved });
     }
 
@@ -33,7 +34,7 @@ module.exports = function handler(req, res) {
       if (!id) {
         return res.status(400).json({ success: false, error: 'id or date is required to delete' });
       }
-      db.deleteSleepLog(id);
+      db.deleteSleepLog(userId, id);
       return res.status(200).json({ success: true, message: 'Sleep log deleted' });
     }
 

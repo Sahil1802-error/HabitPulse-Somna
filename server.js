@@ -19,6 +19,7 @@ const MIME_TYPES = {
 };
 
 const API_ROUTES = {
+  '/api/auth': require('./api/auth.js'),
   '/api/habits': require('./api/habits.js'),
   '/api/habit-toggle': require('./api/habit-toggle.js'),
   '/api/sleep': require('./api/sleep.js'),

@@ -1,12 +1,14 @@
 // Main Frontend Controller for Habit & Sleep Analytics
 const App = {
   currentView: 'daily',
-  selectedDate: '2026-10-23', // Matches workspace current date
+  selectedDate: '2026-10-23',
+  currentUser: null,
 
-  init() {
+  async init() {
     this.setupTheme();
     this.setupEventListeners();
     this.setupDateControls();
+    await this.checkAuthStatus();
     this.loadCurrentView();
   },
 
@@ -31,8 +33,166 @@ const App = {
     }
   },
 
+  // ----------------- Authentication -----------------
+  async checkAuthStatus() {
+    this.currentUser = API.getUser();
+    this.updateUserUI();
+
+    // Verify token with server in background
+    if (this.currentUser) {
+      try {
+        const verifiedUser = await API.getMe();
+        if (verifiedUser) {
+          this.currentUser = verifiedUser;
+          this.updateUserUI();
+          this.syncLocalToCloud();
+        } else {
+          this.currentUser = null;
+          this.updateUserUI();
+        }
+      } catch (e) {
+        // Still keep cached user for offline viewing
+      }
+    }
+  },
+
+  updateUserUI() {
+    const loggedOutDiv = document.getElementById('auth-logged-out');
+    const loggedInDiv = document.getElementById('auth-logged-in');
+    const nameEl = document.getElementById('user-display-name');
+    const avatarEl = document.getElementById('user-avatar-initial');
+
+    if (this.currentUser) {
+      if (loggedOutDiv) loggedOutDiv.style.display = 'none';
+      if (loggedInDiv) loggedInDiv.style.display = 'flex';
+      if (nameEl) nameEl.textContent = this.currentUser.name || this.currentUser.email;
+      if (avatarEl) avatarEl.textContent = (this.currentUser.name || this.currentUser.email || 'U').charAt(0).toUpperCase();
+    } else {
+      if (loggedOutDiv) loggedOutDiv.style.display = 'flex';
+      if (loggedInDiv) loggedInDiv.style.display = 'none';
+    }
+  },
+
+  switchAuthTab(tab) {
+    const isLogin = tab === 'login';
+    const modalTitle = document.getElementById('auth-modal-title');
+    const tabLogin = document.getElementById('tab-login');
+    const tabSignup = document.getElementById('tab-signup');
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    const switchText = document.getElementById('auth-switch-text');
+    const errorBanner = document.getElementById('auth-error-banner');
+
+    if (errorBanner) errorBanner.style.display = 'none';
+
+    if (isLogin) {
+      if (modalTitle) modalTitle.textContent = 'Sign In';
+      if (tabLogin) { tabLogin.style.background = 'var(--accent-indigo)'; tabLogin.style.color = '#fff'; }
+      if (tabSignup) { tabSignup.style.background = 'transparent'; tabSignup.style.color = 'var(--text-secondary)'; }
+      if (loginForm) loginForm.style.display = 'block';
+      if (signupForm) signupForm.style.display = 'none';
+      if (switchText) switchText.innerHTML = `Don't have an account? <a href="#" style="color: var(--accent-cyan); text-decoration: underline;" onclick="App.switchAuthTab('signup'); return false;">Sign up here</a>`;
+    } else {
+      if (modalTitle) modalTitle.textContent = 'Create Account';
+      if (tabLogin) { tabLogin.style.background = 'transparent'; tabLogin.style.color = 'var(--text-secondary)'; }
+      if (tabSignup) { tabSignup.style.background = 'var(--accent-indigo)'; tabSignup.style.color = '#fff'; }
+      if (loginForm) loginForm.style.display = 'none';
+      if (signupForm) signupForm.style.display = 'block';
+      if (switchText) switchText.innerHTML = `Already have an account? <a href="#" style="color: var(--accent-cyan); text-decoration: underline;" onclick="App.switchAuthTab('login'); return false;">Sign in here</a>`;
+    }
+  },
+
+  async handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const errorBanner = document.getElementById('auth-error-banner');
+
+    try {
+      if (errorBanner) errorBanner.style.display = 'none';
+      const res = await API.login(email, password);
+      this.currentUser = res.user;
+      this.updateUserUI();
+      this.closeModal('auth-modal');
+      e.target.reset();
+      this.showToast(`Welcome back, ${res.user.name || 'there'}!`, 'success');
+      this.loadCurrentView();
+    } catch (err) {
+      if (errorBanner) {
+        errorBanner.textContent = err.message || 'Login failed. Please check your credentials.';
+        errorBanner.style.display = 'block';
+      }
+    }
+  },
+
+  async handleSignup(e) {
+    e.preventDefault();
+    const name = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const errorBanner = document.getElementById('auth-error-banner');
+
+    try {
+      if (errorBanner) errorBanner.style.display = 'none';
+      const res = await API.signup(name, email, password);
+      this.currentUser = res.user;
+      this.updateUserUI();
+      this.closeModal('auth-modal');
+      e.target.reset();
+      Charts.fireConfetti();
+      this.showToast(`Welcome, ${res.user.name}! Your tracker is ready.`, 'success');
+      this.loadCurrentView();
+    } catch (err) {
+      if (errorBanner) {
+        errorBanner.textContent = err.message || 'Signup failed. Please try again.';
+        errorBanner.style.display = 'block';
+      }
+    }
+  },
+
+  handleLogout() {
+    API.logout();
+    this.currentUser = null;
+    this.updateUserUI();
+    this.showToast('Logged out. Viewing demo tracker.', 'info');
+    this.loadCurrentView();
+  },
+
+  // Mirror user's database in localStorage for offline & cold-start preservation
+  async backupUserLocalData(data) {
+    if (!this.currentUser) return;
+    try {
+      localStorage.setItem(`hs_user_data_${this.currentUser.id}`, JSON.stringify(data));
+    } catch (e) {}
+  },
+
+  async syncLocalToCloud() {
+    if (!this.currentUser) return;
+    try {
+      const cached = localStorage.getItem(`hs_user_data_${this.currentUser.id}`);
+      if (cached) {
+        const payload = JSON.parse(cached);
+        await API.syncUserData(payload);
+      }
+    } catch (e) {}
+  },
+
   // ----------------- Event Listeners -----------------
   setupEventListeners() {
+    // Auth Triggers
+    document.getElementById('btn-login-trigger')?.addEventListener('click', () => {
+      this.switchAuthTab('login');
+      this.openModal('auth-modal');
+    });
+    document.getElementById('btn-signup-trigger')?.addEventListener('click', () => {
+      this.switchAuthTab('signup');
+      this.openModal('auth-modal');
+    });
+    document.getElementById('btn-logout')?.addEventListener('click', () => this.handleLogout());
+
+    document.getElementById('login-form')?.addEventListener('submit', (e) => this.handleLogin(e));
+    document.getElementById('signup-form')?.addEventListener('submit', (e) => this.handleSignup(e));
+
     // View Pills
     document.querySelectorAll('.view-pill').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -66,7 +226,7 @@ const App = {
           const [bh, bm] = bt.split(':').map(Number);
           const [wh, wm] = wt.split(':').map(Number);
           let diffMinutes = (wh * 60 + wm) - (bh * 60 + bm);
-          if (diffMinutes < 0) diffMinutes += 24 * 60; // overnight
+          if (diffMinutes < 0) diffMinutes += 24 * 60;
           const hours = Math.round((diffMinutes / 60) * 10) / 10;
           document.getElementById('sleep-duration').value = hours;
         }
@@ -129,7 +289,10 @@ const App = {
     } else if (this.currentView === 'monthly') {
       d.setMonth(d.getMonth() + direction);
     }
-    this.selectDate(d.toISOString().split('T')[0]);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    this.selectDate(`${y}-${m}-${day}`);
   },
 
   selectDate(dateStr) {
@@ -196,6 +359,13 @@ const App = {
         const res = await API.getInsights();
         this.renderInsightsView(res.data);
       }
+
+      // Auto-cache user's data in background for instant reload
+      if (this.currentUser) {
+        API.exportBackup().then(b => {
+          if (b.data) this.backupUserLocalData(b.data);
+        }).catch(() => {});
+      }
     } catch (err) {
       this.showToast('Could not load data. Reconnecting...', 'error');
     }
@@ -205,15 +375,12 @@ const App = {
   renderDailyView(data) {
     if (!data) return;
 
-    // Daily Score Ring
     Charts.renderCircularProgress('daily-score-gauge', data.summary.dailyScore, 'Daily Score', '#6366f1', 95);
     Charts.renderCircularProgress('daily-habit-gauge', data.summary.habitCompletionRate, 'Completed', '#10b981', 95);
 
-    // Summary Stat Badges
     document.getElementById('stat-habits-done').textContent = `${data.summary.completedHabits} / ${data.summary.totalHabits}`;
-    document.getElementById('stat-habit-rate').textContent = `${data.summary.habitCompletionRate}% completion rate`;
+    document.getElementById('stat-habit-rate').textContent = `${data.summary.habitCompletionRate}% completed`;
 
-    // Sleep card
     const sleep = data.sleep;
     const sleepDurEl = document.getElementById('stat-sleep-duration');
     const sleepQualEl = document.getElementById('stat-sleep-quality');
@@ -225,7 +392,6 @@ const App = {
       sleepDurEl.textContent = `${sleep.duration} hrs`;
       sleepQualEl.textContent = `${sleep.quality}% Sleep Quality`;
 
-      // Stages breakdown
       const deepPct = Math.round((sleep.deepSleepHours / sleep.duration) * 100) || 20;
       const remPct = Math.round((sleep.remSleepHours / sleep.duration) * 100) || 25;
       const lightPct = 100 - deepPct - remPct;
@@ -236,7 +402,6 @@ const App = {
         <div class="stage-light" style="width: ${lightPct}%;" title="Light Sleep: ${sleep.lightSleepHours}h (${lightPct}%)"></div>
       `;
 
-      // Factors
       sleepFactors.innerHTML = (sleep.factors || []).map(f => {
         const isPos = ['exercised', 'cool_room', 'reading'].includes(f);
         const name = f.replace('_', ' ');
@@ -252,7 +417,6 @@ const App = {
       sleepNotes.textContent = 'Track last night to see deep sleep & quality breakdown.';
     }
 
-    // Daily Habit Checklist
     const listEl = document.getElementById('daily-habit-list');
     if (!listEl) return;
 
@@ -299,7 +463,6 @@ const App = {
   renderWeeklyView(data) {
     if (!data) return;
 
-    // Stat Summary
     document.getElementById('weekly-avg-sleep').textContent = `${data.summary.avgSleepDuration}h`;
     document.getElementById('weekly-avg-quality').textContent = `${data.summary.avgSleepQuality}%`;
     document.getElementById('weekly-overall-habit-rate').textContent = `${data.summary.overallHabitRate}%`;
@@ -312,11 +475,9 @@ const App = {
       debtEl.innerHTML = `<span style="color: var(--accent-emerald); font-weight: 700;">+${Math.abs(debt)}h surplus</span>`;
     }
 
-    // Charts
     Charts.renderWeeklySleepChart('weekly-sleep-chart-container', data.dailyBreakdown, 8.0);
     Charts.renderTrendChart('weekly-trend-chart-container', data.dailyBreakdown);
 
-    // Weekly Habit Matrix
     const matrixEl = document.getElementById('weekly-matrix-container');
     if (!matrixEl) return;
 
@@ -379,10 +540,8 @@ const App = {
     document.getElementById('monthly-total-habits-checked').textContent = `${data.summary.totalCompletedHabits}`;
     document.getElementById('monthly-habit-rate').textContent = `${data.summary.overallHabitRate}%`;
 
-    // Render Calendar Heatmap
     Charts.renderMonthlyHeatmap('monthly-calendar-container', data.calendarDays);
 
-    // Category breakdown
     const catContainer = document.getElementById('monthly-category-container');
     if (catContainer) {
       catContainer.innerHTML = (data.categories || []).map(cat => `
@@ -403,7 +562,6 @@ const App = {
   renderInsightsView(data) {
     if (!data) return;
 
-    // Recommendations
     const recsEl = document.getElementById('insights-recommendations');
     if (recsEl) {
       recsEl.innerHTML = (data.recommendations || []).map(r => `
@@ -416,7 +574,6 @@ const App = {
       `).join('');
     }
 
-    // Correlations list
     const corrEl = document.getElementById('insights-correlations');
     if (corrEl) {
       corrEl.innerHTML = (data.correlations || []).map(c => {
@@ -440,7 +597,6 @@ const App = {
       }).join('');
     }
 
-    // Chronotype
     const chronoEl = document.getElementById('insights-chronotype');
     if (chronoEl && data.chronotype) {
       chronoEl.innerHTML = `
@@ -548,11 +704,11 @@ const App = {
 
   // ----------------- Data Options -----------------
   async seedDemoData() {
-    if (!confirm('This will load 35 days of realistic sample habits, streaks, and sleep correlations. Continue?')) return;
+    if (!confirm('This will load 35 days of sample habits, streaks, and sleep correlations. Continue?')) return;
     try {
       await API.seedData();
       this.closeModal('data-modal');
-      this.showToast('35 days of historical data pre-loaded!', 'success');
+      this.showToast('Historical data pre-loaded!', 'success');
       this.loadCurrentView();
     } catch (err) {
       this.showToast('Could not seed data', 'error');
@@ -633,7 +789,6 @@ const App = {
   }
 };
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
 });

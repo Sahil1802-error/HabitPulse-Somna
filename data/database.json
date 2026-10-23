@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastUpdated": "2026-10-22T18:56:26.103Z",
+  "lastUpdated": "2026-10-23T14:54:47.635Z",
   "habits": [
     {
       "id": "h-1",
@@ -67,6 +67,90 @@
       "targetCount": 1,
       "unit": "check",
       "createdAt": "2026-09-01T08:00:00Z"
+    },
+    {
+      "id": "72757857-094e-44b9-8ae2-fb2b3067ee9f",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Morning Sunlight & Walk",
+      "category": "Health",
+      "icon": "☀️",
+      "color": "#f59e0b",
+      "frequency": "daily",
+      "targetCount": 20,
+      "unit": "min",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "7cdcb2fc-e4ce-45ca-8fbb-a810565ef84b",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Exercise / Workout",
+      "category": "Fitness",
+      "icon": "🏋️",
+      "color": "#ef4444",
+      "frequency": "daily",
+      "targetCount": 45,
+      "unit": "min",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "8d83784f-8df9-4720-81ff-e1a523bc6b66",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Mindful Meditation",
+      "category": "Mindfulness",
+      "icon": "🧘",
+      "color": "#8b5cf6",
+      "frequency": "daily",
+      "targetCount": 15,
+      "unit": "min",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "aa8d516c-304b-4231-924c-e39fe4126b00",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Drink 2.5L Water",
+      "category": "Health",
+      "icon": "💧",
+      "color": "#06b6d4",
+      "frequency": "daily",
+      "targetCount": 2.5,
+      "unit": "L",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "fda734a9-0375-4030-b9b6-e83a5cc45734",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Read Book",
+      "category": "Learning",
+      "icon": "📖",
+      "color": "#3b82f6",
+      "frequency": "daily",
+      "targetCount": 20,
+      "unit": "pages",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "607228be-8d65-4c08-8a50-824abbe103d9",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "No Screen 45m Before Bed",
+      "category": "Sleep",
+      "icon": "🌙",
+      "color": "#10b981",
+      "frequency": "daily",
+      "targetCount": 1,
+      "unit": "check",
+      "createdAt": "2026-10-23T14:54:47.627Z"
+    },
+    {
+      "id": "6dc7218f-2b80-421e-8ac7-ff3580af11a9",
+      "userId": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "title": "Code 1 hour",
+      "category": "Productivity",
+      "icon": "💻",
+      "color": "#3b82f6",
+      "frequency": "daily",
+      "targetCount": 60,
+      "unit": "min",
+      "createdAt": "2026-10-23T14:54:47.635Z"
     }
   ],
   "habitLogs": [
@@ -1811,6 +1895,16 @@
       "factors": [],
       "moodOnWake": "energized",
       "notes": ""
+    }
+  ],
+  "users": [
+    {
+      "id": "u-b6c6a427-7ef3-4954-92af-40fdf0a7d7e3",
+      "name": "Sahil",
+      "email": "sahil@example.com",
+      "passwordHash": "ce48b85325a465b6f57e7057916558be2e2204d101229ed73b98197ee5f9bd03e7779311845b477ae440f2f11a5e6603857ef5e5cf0fccca2a30866bfb4b4082",
+      "salt": "1ddd603f594333135dfaeeea0feb0c6c",
+      "createdAt": "2026-10-23T14:54:47.625Z"
     }
   ]
 }

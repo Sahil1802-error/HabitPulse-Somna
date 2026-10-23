@@ -3,7 +3,7 @@ const db = require('./_db.js');
 module.exports = function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -14,7 +14,8 @@ module.exports = function handler(req, res) {
   }
 
   try {
-    const data = db.getInsightsAndCorrelations();
+    const userId = db.getUserIdFromRequest(req);
+    const data = db.getInsightsAndCorrelations(userId);
     return res.status(200).json({ success: true, data });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

@@ -1,12 +1,13 @@
 // Persistent JSON Database Engine for Habit & Sleep Tracker
-// Designed for both local development and Vercel Serverless Functions
+// Supports Multi-User Authentication, Personal Tracker Data Isolation,
+// Local Development, and Vercel Serverless Function Deployment
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
 const DB_PATH = path.join(process.cwd(), 'data', 'database.json');
+const AUTH_SECRET = process.env.AUTH_SECRET || 'somna-habitpulse-secure-secret-key-2026';
 
-// In-memory cache for serverless environments where local filesystem might be ephemeral
 let memoryDb = null;
 
 function generateId() {
@@ -20,10 +21,167 @@ function formatDateLocal(d) {
   return `${y}-${m}-${day}`;
 }
 
+// ----------------- Password & Token Helpers -----------------
+
+function hashPassword(password, salt) {
+  if (!salt) salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, hash, salt) {
+  const computed = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return computed === hash;
+}
+
+function createToken(userId) {
+  const payload = `${userId}:${Date.now()}`;
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${sig}`).toString('base64');
+}
+
+function verifyToken(token) {
+  if (!token) return null;
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf-8');
+    const parts = decoded.split(':');
+    if (parts.length < 3) return null;
+    const userId = parts[0];
+    const timestamp = parts[1];
+    const sig = parts.slice(2).join(':');
+
+    const expectedSig = crypto.createHmac('sha256', AUTH_SECRET).update(`${userId}:${timestamp}`).digest('hex');
+    if (sig === expectedSig) {
+      return userId;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function getUserIdFromRequest(req) {
+  // 1. Authorization Header: Bearer <token>
+  const authHeader = req.headers && (req.headers.authorization || req.headers.Authorization);
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    const uid = verifyToken(token);
+    if (uid) return uid;
+  }
+
+  // 2. Custom header x-auth-token
+  const customHeader = req.headers && req.headers['x-auth-token'];
+  if (customHeader) {
+    const uid = verifyToken(customHeader);
+    if (uid) return uid;
+  }
+
+  // 3. Query string token parameter
+  if (req.query && req.query.token) {
+    const uid = verifyToken(req.query.token);
+    if (uid) return uid;
+  }
+
+  // Fallback to demo user for unauthenticated guest preview
+  return "u-demo";
+}
+
+// ----------------- Starter Habit Templates -----------------
+
+function getStarterHabitsForUser(userId) {
+  return [
+    {
+      id: generateId(),
+      userId,
+      title: "Morning Sunlight & Walk",
+      category: "Health",
+      icon: "☀️",
+      color: "#f59e0b",
+      frequency: "daily",
+      targetCount: 20,
+      unit: "min",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: generateId(),
+      userId,
+      title: "Exercise / Workout",
+      category: "Fitness",
+      icon: "🏋️",
+      color: "#ef4444",
+      frequency: "daily",
+      targetCount: 45,
+      unit: "min",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: generateId(),
+      userId,
+      title: "Mindful Meditation",
+      category: "Mindfulness",
+      icon: "🧘",
+      color: "#8b5cf6",
+      frequency: "daily",
+      targetCount: 15,
+      unit: "min",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: generateId(),
+      userId,
+      title: "Drink 2.5L Water",
+      category: "Health",
+      icon: "💧",
+      color: "#06b6d4",
+      frequency: "daily",
+      targetCount: 2.5,
+      unit: "L",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: generateId(),
+      userId,
+      title: "Read Book",
+      category: "Learning",
+      icon: "📖",
+      color: "#3b82f6",
+      frequency: "daily",
+      targetCount: 20,
+      unit: "pages",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: generateId(),
+      userId,
+      title: "No Screen 45m Before Bed",
+      category: "Sleep",
+      icon: "🌙",
+      color: "#10b981",
+      frequency: "daily",
+      targetCount: 1,
+      unit: "check",
+      createdAt: new Date().toISOString()
+    }
+  ];
+}
+
 function getDefaultData() {
+  const demoUserId = "u-demo";
+  const { hash, salt } = hashPassword("demo123");
+
+  const users = [
+    {
+      id: demoUserId,
+      name: "Demo Explorer",
+      email: "demo@example.com",
+      passwordHash: hash,
+      salt: salt,
+      createdAt: "2026-09-01T08:00:00Z"
+    }
+  ];
+
   const habits = [
     {
       id: "h-1",
+      userId: demoUserId,
       title: "Morning Sunlight & Walk",
       category: "Health",
       icon: "☀️",
@@ -35,6 +193,7 @@ function getDefaultData() {
     },
     {
       id: "h-2",
+      userId: demoUserId,
       title: "Strength Training / Cardio",
       category: "Fitness",
       icon: "🏋️",
@@ -46,6 +205,7 @@ function getDefaultData() {
     },
     {
       id: "h-3",
+      userId: demoUserId,
       title: "Mindful Meditation",
       category: "Mindfulness",
       icon: "🧘",
@@ -57,6 +217,7 @@ function getDefaultData() {
     },
     {
       id: "h-4",
+      userId: demoUserId,
       title: "Drink 3 Liters Water",
       category: "Health",
       icon: "💧",
@@ -68,6 +229,7 @@ function getDefaultData() {
     },
     {
       id: "h-5",
+      userId: demoUserId,
       title: "Read Non-Fiction Book",
       category: "Learning",
       icon: "📖",
@@ -79,6 +241,7 @@ function getDefaultData() {
     },
     {
       id: "h-6",
+      userId: demoUserId,
       title: "No Screen 45m Before Bed",
       category: "Sleep",
       icon: "🌙",
@@ -90,47 +253,41 @@ function getDefaultData() {
     }
   ];
 
-  // Generate 35 days of historical data up to today (2026-10-23)
   const habitLogs = [];
   const sleepLogs = [];
-  const today = new Date(2026, 9, 23); // Month is 0-indexed: 9 = October
+  const today = new Date(2026, 9, 23);
 
   for (let i = 34; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateStr = formatDateLocal(d);
 
-    // Seed habit logs with realistic completion probability
     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
     const isGoodDay = (i % 7 !== 2 && i % 7 !== 5);
 
     habits.forEach((habit, hIdx) => {
       let completed = false;
-      let val = 0;
-
-      // Realistic variation per habit
       const rand = (Math.sin(i * 13 + hIdx * 7) + 1) / 2;
-      if (hIdx === 0) completed = rand > 0.25; // Sunlight
-      if (hIdx === 1) completed = isWeekend ? rand > 0.4 : rand > 0.3; // Exercise
-      if (hIdx === 2) completed = rand > 0.35; // Meditation
-      if (hIdx === 3) completed = rand > 0.2;  // Water
-      if (hIdx === 4) completed = rand > 0.3;  // Reading
-      if (hIdx === 5) completed = isGoodDay ? rand > 0.25 : rand > 0.65; // No screens
+      if (hIdx === 0) completed = rand > 0.25;
+      if (hIdx === 1) completed = isWeekend ? rand > 0.4 : rand > 0.3;
+      if (hIdx === 2) completed = rand > 0.35;
+      if (hIdx === 3) completed = rand > 0.2;
+      if (hIdx === 4) completed = rand > 0.3;
+      if (hIdx === 5) completed = isGoodDay ? rand > 0.25 : rand > 0.65;
 
       if (completed) {
-        val = habit.targetCount;
         habitLogs.push({
           id: `hl-${dateStr}-${habit.id}`,
+          userId: demoUserId,
           habitId: habit.id,
           date: dateStr,
           completed: true,
-          value: val,
+          value: habit.targetCount,
           notes: completed ? "Accomplished target" : ""
         });
       }
     });
 
-    // Seed sleep logs correlated with habit adherence
     const didExercise = habitLogs.some(hl => hl.date === dateStr && hl.habitId === "h-2" && hl.completed);
     const didNoScreen = habitLogs.some(hl => hl.date === dateStr && hl.habitId === "h-6" && hl.completed);
     const didMeditate = habitLogs.some(hl => hl.date === dateStr && hl.habitId === "h-3" && hl.completed);
@@ -154,21 +311,17 @@ function getDefaultData() {
       quality -= 12;
       factors.push("screen_time");
     }
-    if (didMeditate) {
-      quality += 4;
-    }
+    if (didMeditate) quality += 4;
     if (isWeekend) {
       bedtime = "23:45";
       wakeTime = "07:45";
       duration += 0.5;
     }
 
-    // Add gentle noise
     const noise = ((Math.sin(i * 5) + 1) / 2) * 8 - 4;
     quality = Math.max(52, Math.min(98, Math.round(quality + noise)));
     duration = Math.max(5.5, Math.min(9.5, Math.round((duration + (noise / 10)) * 10) / 10));
 
-    // Calculate sleep stages
     const deepHours = Math.round((duration * (quality > 80 ? 0.23 : 0.16)) * 10) / 10;
     const remHours = Math.round((duration * (quality > 80 ? 0.24 : 0.20)) * 10) / 10;
     const lightHours = Math.round((duration - deepHours - remHours) * 10) / 10;
@@ -181,6 +334,7 @@ function getDefaultData() {
 
     sleepLogs.push({
       id: `sl-${dateStr}`,
+      userId: demoUserId,
       date: dateStr,
       bedtime,
       wakeTime,
@@ -197,8 +351,9 @@ function getDefaultData() {
   }
 
   return {
-    version: "1.0.0",
+    version: "2.0.0",
     lastUpdated: new Date().toISOString(),
+    users,
     habits,
     habitLogs,
     sleepLogs
@@ -214,13 +369,16 @@ function getDatabase() {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, 'utf-8');
       memoryDb = JSON.parse(content);
+      // Ensure users array exists
+      if (!memoryDb.users) {
+        memoryDb.users = [];
+      }
       return memoryDb;
     }
   } catch (err) {
     console.warn("Could not read database from disk, using fallback:", err.message);
   }
 
-  // Initialize with rich default data
   memoryDb = getDefaultData();
   saveDatabase(memoryDb);
   return memoryDb;
@@ -236,22 +394,94 @@ function saveDatabase(data) {
     }
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    // On Vercel serverless, filesystem may be read-only; in-memory cache handles requests during instance lifecycle
     console.warn("Write to disk not allowed (serverless read-only filesystem), keeping in-memory state:", err.message);
   }
 }
 
-// ----------------- CRUD Operations -----------------
+// ----------------- User Authentication Operations -----------------
 
-function getHabits() {
+function registerUser(name, email, password) {
   const db = getDatabase();
-  return db.habits || [];
+  db.users = db.users || [];
+
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = db.users.find(u => u.email.toLowerCase() === cleanEmail);
+  if (existing) {
+    throw new Error('An account with this email already exists.');
+  }
+
+  const { hash, salt } = hashPassword(password);
+  const userId = `u-${generateId()}`;
+
+  const newUser = {
+    id: userId,
+    name: name.trim(),
+    email: cleanEmail,
+    passwordHash: hash,
+    salt,
+    createdAt: new Date().toISOString()
+  };
+
+  db.users.push(newUser);
+
+  // Automatically initialize starter habits for the new user
+  const starterHabits = getStarterHabitsForUser(userId);
+  db.habits = db.habits || [];
+  db.habits.push(...starterHabits);
+
+  saveDatabase(db);
+
+  const token = createToken(userId);
+  return {
+    user: { id: newUser.id, name: newUser.name, email: newUser.email },
+    token
+  };
 }
 
-function createHabit(habitData) {
+function authenticateUser(email, password) {
   const db = getDatabase();
+  db.users = db.users || [];
+
+  const cleanEmail = email.trim().toLowerCase();
+  const user = db.users.find(u => u.email.toLowerCase() === cleanEmail);
+  if (!user) {
+    throw new Error('Invalid email or password.');
+  }
+
+  const isValid = verifyPassword(password, user.passwordHash, user.salt);
+  if (!isValid) {
+    throw new Error('Invalid email or password.');
+  }
+
+  const token = createToken(user.id);
+  return {
+    user: { id: user.id, name: user.name, email: user.email },
+    token
+  };
+}
+
+function getUserById(userId) {
+  const db = getDatabase();
+  const user = (db.users || []).find(u => u.id === userId);
+  if (!user) return null;
+  return { id: user.id, name: user.name, email: user.email };
+}
+
+// ----------------- Per-User CRUD Operations -----------------
+
+function getHabits(userId) {
+  const db = getDatabase();
+  const targetUser = userId || "u-demo";
+  return (db.habits || []).filter(h => (h.userId || "u-demo") === targetUser);
+}
+
+function createHabit(userId, habitData) {
+  const db = getDatabase();
+  const targetUser = userId || "u-demo";
+
   const newHabit = {
     id: habitData.id || generateId(),
+    userId: targetUser,
     title: habitData.title.trim(),
     category: habitData.category || "Health",
     icon: habitData.icon || "🎯",
@@ -267,9 +497,10 @@ function createHabit(habitData) {
   return newHabit;
 }
 
-function updateHabit(id, updateData) {
+function updateHabit(userId, id, updateData) {
   const db = getDatabase();
-  const idx = (db.habits || []).findIndex(h => h.id === id);
+  const targetUser = userId || "u-demo";
+  const idx = (db.habits || []).findIndex(h => h.id === id && (h.userId || "u-demo") === targetUser);
   if (idx === -1) return null;
 
   db.habits[idx] = {
@@ -281,26 +512,30 @@ function updateHabit(id, updateData) {
   return db.habits[idx];
 }
 
-function deleteHabit(id) {
+function deleteHabit(userId, id) {
   const db = getDatabase();
-  db.habits = (db.habits || []).filter(h => h.id !== id);
-  db.habitLogs = (db.habitLogs || []).filter(hl => hl.habitId !== id);
+  const targetUser = userId || "u-demo";
+  db.habits = (db.habits || []).filter(h => !(h.id === id && (h.userId || "u-demo") === targetUser));
+  db.habitLogs = (db.habitLogs || []).filter(hl => !(hl.habitId === id && (hl.userId || "u-demo") === targetUser));
   saveDatabase(db);
   return true;
 }
 
-function getHabitLogs(startDate, endDate) {
+function getHabitLogs(userId, startDate, endDate) {
   const db = getDatabase();
-  let logs = db.habitLogs || [];
+  const targetUser = userId || "u-demo";
+  let logs = (db.habitLogs || []).filter(l => (l.userId || "u-demo") === targetUser);
   if (startDate) logs = logs.filter(l => l.date >= startDate);
   if (endDate) logs = logs.filter(l => l.date <= endDate);
   return logs;
 }
 
-function toggleHabitLog(habitId, date, customValue, notes) {
+function toggleHabitLog(userId, habitId, date, customValue, notes) {
   const db = getDatabase();
+  const targetUser = userId || "u-demo";
   db.habitLogs = db.habitLogs || [];
-  const existingIdx = db.habitLogs.findIndex(l => l.habitId === habitId && l.date === date);
+
+  const existingIdx = db.habitLogs.findIndex(l => (l.userId || "u-demo") === targetUser && l.habitId === habitId && l.date === date);
 
   if (existingIdx !== -1) {
     const current = db.habitLogs[existingIdx];
@@ -311,7 +546,6 @@ function toggleHabitLog(habitId, date, customValue, notes) {
       saveDatabase(db);
       return current;
     } else {
-      // Toggle
       current.completed = !current.completed;
       if (current.completed && current.value === 0) {
         const h = (db.habits || []).find(h => h.id === habitId);
@@ -321,11 +555,11 @@ function toggleHabitLog(habitId, date, customValue, notes) {
       return current;
     }
   } else {
-    // Create new log entry
     const habit = (db.habits || []).find(h => h.id === habitId);
     const val = customValue !== undefined ? Number(customValue) : (habit ? habit.targetCount : 1);
     const newLog = {
       id: `hl-${date}-${habitId}`,
+      userId: targetUser,
       habitId,
       date,
       completed: true,
@@ -338,20 +572,22 @@ function toggleHabitLog(habitId, date, customValue, notes) {
   }
 }
 
-function getSleepLogs(startDate, endDate) {
+function getSleepLogs(userId, startDate, endDate) {
   const db = getDatabase();
-  let logs = db.sleepLogs || [];
+  const targetUser = userId || "u-demo";
+  let logs = (db.sleepLogs || []).filter(l => (l.userId || "u-demo") === targetUser);
   if (startDate) logs = logs.filter(l => l.date >= startDate);
   if (endDate) logs = logs.filter(l => l.date <= endDate);
-  // Sort descending by date
   return logs.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function saveSleepLog(sleepData) {
+function saveSleepLog(userId, sleepData) {
   const db = getDatabase();
+  const targetUser = userId || "u-demo";
   db.sleepLogs = db.sleepLogs || [];
   const date = sleepData.date;
-  const existingIdx = db.sleepLogs.findIndex(l => l.date === date);
+
+  const existingIdx = db.sleepLogs.findIndex(l => (l.userId || "u-demo") === targetUser && l.date === date);
 
   const duration = Number(sleepData.duration) || 8;
   const quality = Math.min(100, Math.max(1, Number(sleepData.quality) || 80));
@@ -361,6 +597,7 @@ function saveSleepLog(sleepData) {
 
   const entry = {
     id: sleepData.id || `sl-${date}`,
+    userId: targetUser,
     date,
     bedtime: sleepData.bedtime || "23:00",
     wakeTime: sleepData.wakeTime || "07:00",
@@ -384,14 +621,15 @@ function saveSleepLog(sleepData) {
   return entry;
 }
 
-function deleteSleepLog(idOrDate) {
+function deleteSleepLog(userId, idOrDate) {
   const db = getDatabase();
-  db.sleepLogs = (db.sleepLogs || []).filter(l => l.id !== idOrDate && l.date !== idOrDate);
+  const targetUser = userId || "u-demo";
+  db.sleepLogs = (db.sleepLogs || []).filter(l => (l.userId || "u-demo") === targetUser && l.id !== idOrDate && l.date !== idOrDate);
   saveDatabase(db);
   return true;
 }
 
-// ----------------- Analytics Calculations -----------------
+// ----------------- Per-User Analytics -----------------
 
 function calculateHabitStreaks(habits, habitLogs, referenceDateStr) {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date(2026, 9, 23);
@@ -403,23 +641,20 @@ function calculateHabitStreaks(habits, habitLogs, referenceDateStr) {
     let tempStreak = 0;
     let checkDate = new Date(refDate);
 
-    // Calculate current streak backward from refDate
     for (let i = 0; i < 90; i++) {
       const dStr = formatDateLocal(checkDate);
       const log = habitLogs.find(l => l.habitId === h.id && l.date === dStr && l.completed);
-      
+
       if (log) {
         currentStreak++;
       } else if (i === 0) {
-        // Today might not be completed yet, check yesterday before breaking
-        // continue to check yesterday
+        // Today might not be completed yet
       } else {
         break;
       }
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
-    // Calculate longest streak in entire dataset
     const sortedDates = habitLogs
       .filter(l => l.habitId === h.id && l.completed)
       .map(l => l.date)
@@ -452,13 +687,14 @@ function calculateHabitStreaks(habits, habitLogs, referenceDateStr) {
   return streaks;
 }
 
-function getDailyAnalytics(dateStr) {
-  const db = getDatabase();
+function getDailyAnalytics(userId, dateStr) {
+  const targetUser = userId || "u-demo";
   const date = dateStr || formatDateLocal(new Date());
-  const habits = db.habits || [];
-  const logs = (db.habitLogs || []).filter(l => l.date === date);
-  const sleep = (db.sleepLogs || []).find(l => l.date === date) || null;
-  const streaks = calculateHabitStreaks(habits, db.habitLogs || [], date);
+  const habits = getHabits(targetUser);
+  const logs = getHabitLogs(targetUser, date, date);
+  const userSleeps = getSleepLogs(targetUser, date, date);
+  const sleep = userSleeps.find(l => l.date === date) || null;
+  const streaks = calculateHabitStreaks(habits, getHabitLogs(targetUser), date);
 
   const habitsWithStatus = habits.map(h => {
     const log = logs.find(l => l.habitId === h.id);
@@ -476,7 +712,6 @@ function getDailyAnalytics(dateStr) {
   const completedHabits = habitsWithStatus.filter(h => h.completed).length;
   const habitCompletionRate = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0;
 
-  // Daily Score: 50% sleep quality + 50% habit completion rate
   let dailyScore = 0;
   if (sleep && totalHabits > 0) {
     dailyScore = Math.round((sleep.quality * 0.5) + (habitCompletionRate * 0.5));
@@ -502,11 +737,10 @@ function getDailyAnalytics(dateStr) {
   };
 }
 
-function getWeeklyAnalytics(referenceDateStr) {
-  const db = getDatabase();
+function getWeeklyAnalytics(userId, referenceDateStr) {
+  const targetUser = userId || "u-demo";
   const ref = referenceDateStr ? new Date(referenceDateStr) : new Date(2026, 9, 23);
-  
-  // Calculate start of week (Monday) and end of week (Sunday)
+
   const day = ref.getDay();
   const diffToMonday = (day === 0 ? -6 : 1) - day;
   const monday = new Date(ref);
@@ -522,11 +756,10 @@ function getWeeklyAnalytics(referenceDateStr) {
   const startDate = days[0];
   const endDate = days[6];
 
-  const habits = db.habits || [];
-  const habitLogs = (db.habitLogs || []).filter(l => l.date >= startDate && l.date <= endDate);
-  const sleepLogs = (db.sleepLogs || []).filter(l => l.date >= startDate && l.date <= endDate);
+  const habits = getHabits(targetUser);
+  const habitLogs = getHabitLogs(targetUser, startDate, endDate);
+  const sleepLogs = getSleepLogs(targetUser, startDate, endDate);
 
-  // Daily breakdown
   const dailyBreakdown = days.map(dStr => {
     const dateObj = new Date(dStr);
     const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dateObj.getDay()];
@@ -548,7 +781,6 @@ function getWeeklyAnalytics(referenceDateStr) {
     };
   });
 
-  // Habit Matrix: Habit x 7 days
   const habitMatrix = habits.map(h => {
     const dayStatuses = days.map(dStr => {
       const log = habitLogs.find(l => l.habitId === h.id && l.date === dStr);
@@ -571,7 +803,6 @@ function getWeeklyAnalytics(referenceDateStr) {
     };
   });
 
-  // Weekly aggregates
   const validSleeps = sleepLogs.filter(s => s.duration > 0);
   const avgSleepDuration = validSleeps.length > 0
     ? Math.round((validSleeps.reduce((acc, s) => acc + s.duration, 0) / validSleeps.length) * 10) / 10
@@ -599,7 +830,7 @@ function getWeeklyAnalytics(referenceDateStr) {
       avgSleepDuration,
       avgSleepQuality,
       targetSleepDuration,
-      sleepDebt, // positive = debt, negative = surplus
+      sleepDebt,
       overallHabitRate,
       totalCompletedChecks,
       totalPossibleChecks
@@ -607,20 +838,19 @@ function getWeeklyAnalytics(referenceDateStr) {
   };
 }
 
-function getMonthlyAnalytics(year, month) {
-  const db = getDatabase();
+function getMonthlyAnalytics(userId, year, month) {
+  const targetUser = userId || "u-demo";
   const y = Number(year) || 2026;
-  const m = Number(month) || 10; // 1-12
+  const m = Number(month) || 10;
 
   const startOfMonth = `${y}-${String(m).padStart(2, '0')}-01`;
   const lastDay = new Date(y, m, 0).getDate();
   const endOfMonth = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-  const habits = db.habits || [];
-  const habitLogs = (db.habitLogs || []).filter(l => l.date >= startOfMonth && l.date <= endOfMonth);
-  const sleepLogs = (db.sleepLogs || []).filter(l => l.date >= startOfMonth && l.date <= endOfMonth);
+  const habits = getHabits(targetUser);
+  const habitLogs = getHabitLogs(targetUser, startOfMonth, endOfMonth);
+  const sleepLogs = getSleepLogs(targetUser, startOfMonth, endOfMonth);
 
-  // Calendar Heatmap Days (all days of month)
   const calendarDays = [];
   for (let i = 1; i <= lastDay; i++) {
     const dStr = `${y}-${String(m).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
@@ -640,7 +870,6 @@ function getMonthlyAnalytics(year, month) {
     });
   }
 
-  // Category breakdown
   const categoryStats = {};
   habits.forEach(h => {
     if (!categoryStats[h.category]) {
@@ -656,7 +885,6 @@ function getMonthlyAnalytics(year, month) {
     rate: c.totalPossible > 0 ? Math.round((c.completed / c.totalPossible) * 100) : 0
   }));
 
-  // Aggregates
   const validSleeps = sleepLogs.filter(s => s.duration > 0);
   const avgSleepDuration = validSleeps.length > 0
     ? Math.round((validSleeps.reduce((acc, s) => acc + s.duration, 0) / validSleeps.length) * 10) / 10
@@ -688,13 +916,12 @@ function getMonthlyAnalytics(year, month) {
   };
 }
 
-function getInsightsAndCorrelations() {
-  const db = getDatabase();
-  const habits = db.habits || [];
-  const habitLogs = db.habitLogs || [];
-  const sleepLogs = db.sleepLogs || [];
+function getInsightsAndCorrelations(userId) {
+  const targetUser = userId || "u-demo";
+  const habits = getHabits(targetUser);
+  const habitLogs = getHabitLogs(targetUser);
+  const sleepLogs = getSleepLogs(targetUser);
 
-  // Correlate each habit with sleep quality
   const correlations = habits.map(h => {
     let daysWithHabit = 0;
     let qualityWithHabitSum = 0;
@@ -725,11 +952,10 @@ function getInsightsAndCorrelations() {
       daysWithoutHabit,
       avgQualityWith: avgWith,
       avgQualityWithout: avgWithout,
-      impact // Positive means boosts sleep score
+      impact
     };
   }).sort((a, b) => b.impact - a.impact);
 
-  // Chronotype & Weekend vs Weekday analysis
   let weekdayQualitySum = 0, weekdayCount = 0;
   let weekendQualitySum = 0, weekendCount = 0;
   let weekdayDurationSum = 0;
@@ -754,7 +980,6 @@ function getInsightsAndCorrelations() {
   const weekdayAvgDuration = weekdayCount > 0 ? Math.round((weekdayDurationSum / weekdayCount) * 10) / 10 : 0;
   const weekendAvgDuration = weekendCount > 0 ? Math.round((weekendDurationSum / weekendCount) * 10) / 10 : 0;
 
-  // Key actionable insights
   const recommendations = [];
   const topHabit = correlations[0];
   if (topHabit && topHabit.impact > 0) {
@@ -762,15 +987,6 @@ function getInsightsAndCorrelations() {
       type: "boost",
       title: `Supercharge Sleep with ${topHabit.title}`,
       description: `Completing "${topHabit.title}" raises your average sleep quality by +${topHabit.impact}% (${topHabit.avgQualityWith}% vs ${topHabit.avgQualityWithout}%). Prioritize this before bedtime.`
-    });
-  }
-
-  const noScreenHabit = correlations.find(c => c.habitId === "h-6");
-  if (noScreenHabit && noScreenHabit.impact > 0) {
-    recommendations.push({
-      type: "recovery",
-      title: "Screen Detox Wind-Down",
-      description: `Days without late screen time yield deep restorative sleep cycles with an average sleep score of ${noScreenHabit.avgQualityWith}%. Keep phones charging outside the bedroom.`
     });
   }
 
@@ -802,10 +1018,57 @@ function getInsightsAndCorrelations() {
   };
 }
 
+// ----------------- Per-User Sync Operations -----------------
+
+function getUserData(userId) {
+  const targetUser = userId || "u-demo";
+  return {
+    habits: getHabits(targetUser),
+    habitLogs: getHabitLogs(targetUser),
+    sleepLogs: getSleepLogs(targetUser)
+  };
+}
+
+function syncUserData(userId, payload) {
+  const db = getDatabase();
+  const targetUser = userId || "u-demo";
+  if (!payload) return getUserData(targetUser);
+
+  if (Array.isArray(payload.habits) && payload.habits.length > 0) {
+    db.habits = (db.habits || []).filter(h => (h.userId || "u-demo") !== targetUser);
+    payload.habits.forEach(h => {
+      db.habits.push({ ...h, userId: targetUser });
+    });
+  }
+
+  if (Array.isArray(payload.habitLogs)) {
+    db.habitLogs = (db.habitLogs || []).filter(hl => (hl.userId || "u-demo") !== targetUser);
+    payload.habitLogs.forEach(hl => {
+      db.habitLogs.push({ ...hl, userId: targetUser });
+    });
+  }
+
+  if (Array.isArray(payload.sleepLogs)) {
+    db.sleepLogs = (db.sleepLogs || []).filter(sl => (sl.userId || "u-demo") !== targetUser);
+    payload.sleepLogs.forEach(sl => {
+      db.sleepLogs.push({ ...sl, userId: targetUser });
+    });
+  }
+
+  saveDatabase(db);
+  return getUserData(targetUser);
+}
+
 module.exports = {
   getDatabase,
   saveDatabase,
   getDefaultData,
+  registerUser,
+  authenticateUser,
+  getUserById,
+  createToken,
+  verifyToken,
+  getUserIdFromRequest,
   getHabits,
   createHabit,
   updateHabit,
@@ -818,5 +1081,7 @@ module.exports = {
   getDailyAnalytics,
   getWeeklyAnalytics,
   getMonthlyAnalytics,
-  getInsightsAndCorrelations
+  getInsightsAndCorrelations,
+  getUserData,
+  syncUserData
 };

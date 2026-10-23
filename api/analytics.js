@@ -3,7 +3,7 @@ const db = require('./_db.js');
 module.exports = function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -19,19 +19,20 @@ module.exports = function handler(req, res) {
     const date = url.searchParams.get('date');
     const year = url.searchParams.get('year');
     const month = url.searchParams.get('month');
+    const userId = db.getUserIdFromRequest(req);
 
     if (view === 'daily') {
-      const data = db.getDailyAnalytics(date);
+      const data = db.getDailyAnalytics(userId, date);
       return res.status(200).json({ success: true, view: 'daily', data });
     }
 
     if (view === 'weekly') {
-      const data = db.getWeeklyAnalytics(date);
+      const data = db.getWeeklyAnalytics(userId, date);
       return res.status(200).json({ success: true, view: 'weekly', data });
     }
 
     if (view === 'monthly') {
-      const data = db.getMonthlyAnalytics(year, month);
+      const data = db.getMonthlyAnalytics(userId, year, month);
       return res.status(200).json({ success: true, view: 'monthly', data });
     }
 
