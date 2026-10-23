@@ -209,31 +209,13 @@ const App = {
 
     // Modal Triggers
     document.getElementById('btn-add-habit')?.addEventListener('click', () => this.openModal('habit-modal'));
-    document.getElementById('btn-log-sleep')?.addEventListener('click', () => {
-      document.getElementById('sleep-date-input').value = this.selectedDate;
-      this.openModal('sleep-modal');
-    });
+    document.getElementById('btn-log-sleep')?.addEventListener('click', () => this.openSleepModal(this.selectedDate));
     document.getElementById('btn-data-options')?.addEventListener('click', () => this.openModal('data-modal'));
 
-    // Sleep Calculator auto duration update
-    const bedtimeInput = document.getElementById('sleep-bedtime');
-    const wakeInput = document.getElementById('sleep-waketime');
-    if (bedtimeInput && wakeInput) {
-      const calcDuration = () => {
-        const bt = bedtimeInput.value;
-        const wt = wakeInput.value;
-        if (bt && wt) {
-          const [bh, bm] = bt.split(':').map(Number);
-          const [wh, wm] = wt.split(':').map(Number);
-          let diffMinutes = (wh * 60 + wm) - (bh * 60 + bm);
-          if (diffMinutes < 0) diffMinutes += 24 * 60;
-          const hours = Math.round((diffMinutes / 60) * 10) / 10;
-          document.getElementById('sleep-duration').value = hours;
-        }
-      };
-      bedtimeInput.addEventListener('change', calcDuration);
-      wakeInput.addEventListener('change', calcDuration);
-    }
+    // Sleep Modal Date change: auto load that date's sleep info
+    document.getElementById('sleep-date-input')?.addEventListener('change', (e) => {
+      if (e.target.value) this.loadSleepModalForDate(e.target.value);
+    });
 
     // Quality slider range value update
     const qualityRange = document.getElementById('sleep-quality-range');
@@ -248,13 +230,15 @@ const App = {
     document.getElementById('habit-form')?.addEventListener('submit', (e) => this.handleHabitSubmit(e));
     document.getElementById('sleep-form')?.addEventListener('submit', (e) => this.handleSleepSubmit(e));
 
-    // Factor tag toggles inside Sleep Modal
-    document.querySelectorAll('.factor-checkbox').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const parentTag = e.target.closest('.factor-select-tag');
-        if (parentTag) {
-          parentTag.classList.toggle('active', e.target.checked);
+    // Interactive Factor Chips Toggles
+    document.querySelectorAll('.factor-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        const cb = chip.querySelector('.factor-checkbox');
+        if (!cb) return;
+        if (e.target !== cb) {
+          cb.checked = !cb.checked;
         }
+        chip.classList.toggle('active', cb.checked);
       });
     });
   },
@@ -402,11 +386,13 @@ const App = {
         <div class="stage-light" style="width: ${lightPct}%;" title="Light Sleep: ${sleep.lightSleepHours}h (${lightPct}%)"></div>
       `;
 
-      sleepFactors.innerHTML = (sleep.factors || []).map(f => {
-        const isPos = ['exercised', 'cool_room', 'reading'].includes(f);
-        const name = f.replace('_', ' ');
-        return `<span class="factor-tag ${isPos ? 'positive' : 'negative'}">${name}</span>`;
-      }).join('') || '<span style="font-size: 0.8rem; color: var(--text-muted);">No negative factors recorded</span>';
+      sleepFactors.innerHTML = (sleep.factors && sleep.factors.length > 0)
+        ? sleep.factors.map(f => {
+            const isPos = ['exercised', 'cool_room', 'reading', 'meditation', 'consistent_time'].includes(f);
+            const name = f.replace(/_/g, ' ');
+            return `<span class="factor-tag ${isPos ? 'positive' : 'negative'}">${isPos ? '✓ ' : '⚠ '}${name}</span>`;
+          }).join('')
+        : '<span style="font-size: 0.8rem; color: var(--text-muted);">No factors recorded</span>';
 
       sleepNotes.textContent = sleep.notes ? `"${sleep.notes}"` : 'Bedtime: ' + sleep.bedtime + ' • Wake: ' + sleep.wakeTime;
     } else {
@@ -668,6 +654,166 @@ const App = {
   },
 
   // ----------------- Sleep Actions -----------------
+  openSleepModal(date) {
+    const targetDate = date || this.selectedDate;
+    const dateInput = document.getElementById('sleep-date-input');
+    if (dateInput) dateInput.value = targetDate;
+    this.loadSleepModalForDate(targetDate);
+    this.openModal('sleep-modal');
+  },
+
+  async loadSleepModalForDate(date) {
+    try {
+      const res = await API.getDailyAnalytics(date);
+      const sleep = res.data && res.data.sleep;
+
+      if (sleep) {
+        // Parse Bedtime 24h to 12h
+        const [bh, bm] = (sleep.bedtime || "23:00").split(':').map(Number);
+        let bedH12 = bh % 12 || 12;
+        let bedAmpm = bh >= 12 ? 'PM' : 'AM';
+        let bedMStr = String(bm).padStart(2, '0');
+        const roundedM = String(Math.round(bm / 5) * 5 % 60).padStart(2, '0');
+
+        const bedHourSelect = document.getElementById('bed-hour');
+        const bedMinSelect = document.getElementById('bed-min');
+        if (bedHourSelect) bedHourSelect.value = String(bedH12);
+        if (bedMinSelect) bedMinSelect.value = bedMinSelect.querySelector(`option[value="${bedMStr}"]`) ? bedMStr : roundedM;
+        this.setAmPm('bed', bedAmpm, false);
+
+        // Parse Wake Time 24h to 12h
+        const [wh, wm] = (sleep.wakeTime || "07:00").split(':').map(Number);
+        let wakeH12 = wh % 12 || 12;
+        let wakeAmpm = wh >= 12 ? 'PM' : 'AM';
+        let wakeMStr = String(wm).padStart(2, '0');
+        const roundedWM = String(Math.round(wm / 5) * 5 % 60).padStart(2, '0');
+
+        const wakeHourSelect = document.getElementById('wake-hour');
+        const wakeMinSelect = document.getElementById('wake-min');
+        if (wakeHourSelect) wakeHourSelect.value = String(wakeH12);
+        if (wakeMinSelect) wakeMinSelect.value = wakeMinSelect.querySelector(`option[value="${wakeMStr}"]`) ? wakeMStr : roundedWM;
+        this.setAmPm('wake', wakeAmpm, false);
+
+        // Quality slider
+        const qualityRange = document.getElementById('sleep-quality-range');
+        const qualityVal = document.getElementById('quality-val-display');
+        if (qualityRange) qualityRange.value = sleep.quality || 80;
+        if (qualityVal) qualityVal.textContent = `${sleep.quality || 80}%`;
+
+        // Mood
+        const moodSelect = document.getElementById('sleep-mood');
+        if (moodSelect) moodSelect.value = sleep.moodOnWake || 'refreshed';
+
+        // Notes
+        const notesEl = document.getElementById('sleep-notes');
+        if (notesEl) notesEl.value = sleep.notes || '';
+
+        // Only select factors that the user previously saved for this date!
+        const recordedFactors = Array.isArray(sleep.factors) ? sleep.factors : [];
+        document.querySelectorAll('.factor-chip').forEach(chip => {
+          const cb = chip.querySelector('.factor-checkbox');
+          if (cb) {
+            const active = recordedFactors.includes(cb.value);
+            cb.checked = active;
+            chip.classList.toggle('active', active);
+          }
+        });
+      } else {
+        // Clean slate! No factors chosen by default!
+        const bedHour = document.getElementById('bed-hour');
+        const bedMin = document.getElementById('bed-min');
+        if (bedHour) bedHour.value = "11";
+        if (bedMin) bedMin.value = "00";
+        this.setAmPm('bed', 'PM', false);
+
+        const wakeHour = document.getElementById('wake-hour');
+        const wakeMin = document.getElementById('wake-min');
+        if (wakeHour) wakeHour.value = "7";
+        if (wakeMin) wakeMin.value = "00";
+        this.setAmPm('wake', 'AM', false);
+
+        const qualityRange = document.getElementById('sleep-quality-range');
+        const qualityVal = document.getElementById('quality-val-display');
+        if (qualityRange) qualityRange.value = 80;
+        if (qualityVal) qualityVal.textContent = "80%";
+
+        const moodSelect = document.getElementById('sleep-mood');
+        if (moodSelect) moodSelect.value = 'refreshed';
+
+        const notesEl = document.getElementById('sleep-notes');
+        if (notesEl) notesEl.value = '';
+
+        // Reset all factor chips to unchecked!
+        document.querySelectorAll('.factor-chip').forEach(chip => {
+          const cb = chip.querySelector('.factor-checkbox');
+          if (cb) cb.checked = false;
+          chip.classList.remove('active');
+        });
+      }
+
+      this.onTimePickerChange();
+    } catch (err) {
+      console.warn('Error loading sleep data for modal:', err);
+    }
+  },
+
+  setAmPm(type, ampm, triggerChange = true) {
+    if (type === 'bed') {
+      document.getElementById('bed-pm')?.classList.toggle('active', ampm === 'PM');
+      document.getElementById('bed-am')?.classList.toggle('active', ampm === 'AM');
+    } else if (type === 'wake') {
+      document.getElementById('wake-pm')?.classList.toggle('active', ampm === 'PM');
+      document.getElementById('wake-am')?.classList.toggle('active', ampm === 'AM');
+    }
+    if (triggerChange) {
+      this.onTimePickerChange();
+    }
+  },
+
+  onTimePickerChange() {
+    const bedHour = Number(document.getElementById('bed-hour')?.value || 11);
+    const bedMin = Number(document.getElementById('bed-min')?.value || 0);
+    const bedPmActive = document.getElementById('bed-pm')?.classList.contains('active');
+    const bedAmpm = bedPmActive ? 'PM' : 'AM';
+
+    const wakeHour = Number(document.getElementById('wake-hour')?.value || 7);
+    const wakeMin = Number(document.getElementById('wake-min')?.value || 0);
+    const wakePmActive = document.getElementById('wake-pm')?.classList.contains('active');
+    const wakeAmpm = wakePmActive ? 'PM' : 'AM';
+
+    const to24h = (h, m, ampm) => {
+      let hour24 = h;
+      if (ampm === 'PM' && hour24 < 12) hour24 += 12;
+      if (ampm === 'AM' && hour24 === 12) hour24 = 0;
+      return `${String(hour24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    const bedtime24 = to24h(bedHour, bedMin, bedAmpm);
+    const wakeTime24 = to24h(wakeHour, wakeMin, wakeAmpm);
+
+    const bedtimeInput = document.getElementById('sleep-bedtime');
+    const wakeInput = document.getElementById('sleep-waketime');
+    if (bedtimeInput) bedtimeInput.value = bedtime24;
+    if (wakeInput) wakeInput.value = wakeTime24;
+
+    const [bh, bm] = bedtime24.split(':').map(Number);
+    const [wh, wm] = wakeTime24.split(':').map(Number);
+    let diffMinutes = (wh * 60 + wm) - (bh * 60 + bm);
+    if (diffMinutes <= 0) diffMinutes += 24 * 60;
+
+    const hours = Math.floor(diffMinutes / 60);
+    const mins = diffMinutes % 60;
+    const decimalHours = Math.round((diffMinutes / 60) * 10) / 10;
+
+    const durationInput = document.getElementById('sleep-duration');
+    if (durationInput) durationInput.value = decimalHours;
+
+    const bannerDisplay = document.getElementById('calc-sleep-duration-display');
+    if (bannerDisplay) {
+      bannerDisplay.textContent = `${hours} hrs ${mins > 0 ? mins + ' mins' : '00 mins'}`;
+    }
+  },
+
   async handleSleepSubmit(e) {
     e.preventDefault();
     const date = document.getElementById('sleep-date-input').value;

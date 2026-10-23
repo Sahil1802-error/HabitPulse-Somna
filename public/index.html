@@ -150,7 +150,7 @@
                 <h2 class="card-title">
                   <span>💤</span> Sleep Architecture & Stages
                 </h2>
-                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="App.openModal('sleep-modal')">
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="App.openSleepModal()">
                   Edit Log
                 </button>
               </div>
@@ -444,20 +444,78 @@
           <input type="date" id="sleep-date-input" class="form-input" required />
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="sleep-bedtime">Bedtime</label>
-            <input type="time" id="sleep-bedtime" class="form-input" value="23:00" required />
+        <!-- Hidden inputs for calculated values -->
+        <input type="hidden" id="sleep-bedtime" value="23:00" />
+        <input type="hidden" id="sleep-waketime" value="07:00" />
+        <input type="hidden" id="sleep-duration" value="8" />
+
+        <!-- Clean Visually Appealing Clock Time Pickers -->
+        <div class="time-picker-grid">
+          <!-- Bedtime Card -->
+          <div class="time-picker-card">
+            <div class="time-picker-header">
+              <span>🌙 Bedtime</span>
+              <span style="font-size: 0.72rem; color: var(--accent-indigo); font-weight: 700;">When you slept</span>
+            </div>
+            <div class="time-selector-row">
+              <select id="bed-hour" class="time-select-unit" aria-label="Bedtime Hour" onchange="App.onTimePickerChange()">
+                <option value="1">01</option><option value="2">02</option><option value="3">03</option>
+                <option value="4">04</option><option value="5">05</option><option value="6">06</option>
+                <option value="7">07</option><option value="8">08</option><option value="9">09</option>
+                <option value="10">10</option><option value="11" selected>11</option><option value="12">12</option>
+              </select>
+              <span class="time-colon">:</span>
+              <select id="bed-min" class="time-select-unit" aria-label="Bedtime Minute" onchange="App.onTimePickerChange()">
+                <option value="00" selected>00</option>
+                <option value="05">05</option><option value="10">10</option>
+                <option value="15">15</option><option value="20">20</option>
+                <option value="25">25</option><option value="30">30</option>
+                <option value="35">35</option><option value="40">40</option>
+                <option value="45">45</option><option value="50">50</option>
+                <option value="55">55</option>
+              </select>
+              <div class="ampm-toggle-group">
+                <button type="button" class="ampm-btn active" id="bed-pm" onclick="App.setAmPm('bed', 'PM')">PM</button>
+                <button type="button" class="ampm-btn" id="bed-am" onclick="App.setAmPm('bed', 'AM')">AM</button>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="sleep-waketime">Wake Time</label>
-            <input type="time" id="sleep-waketime" class="form-input" value="07:00" required />
+
+          <!-- Wake Time Card -->
+          <div class="time-picker-card">
+            <div class="time-picker-header">
+              <span>☀️ Wake Time</span>
+              <span style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 700;">When you woke</span>
+            </div>
+            <div class="time-selector-row">
+              <select id="wake-hour" class="time-select-unit" aria-label="Wake Time Hour" onchange="App.onTimePickerChange()">
+                <option value="1">01</option><option value="2">02</option><option value="3">03</option>
+                <option value="4">04</option><option value="5">05</option><option value="6">06</option>
+                <option value="7" selected>07</option><option value="8">08</option><option value="9">09</option>
+                <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+              </select>
+              <span class="time-colon">:</span>
+              <select id="wake-min" class="time-select-unit" aria-label="Wake Time Minute" onchange="App.onTimePickerChange()">
+                <option value="00" selected>00</option>
+                <option value="05">05</option><option value="10">10</option>
+                <option value="15">15</option><option value="20">20</option>
+                <option value="25">25</option><option value="30">30</option>
+                <option value="35">35</option><option value="40">40</option>
+                <option value="45">45</option><option value="50">50</option>
+                <option value="55">55</option>
+              </select>
+              <div class="ampm-toggle-group">
+                <button type="button" class="ampm-btn" id="wake-pm" onclick="App.setAmPm('wake', 'PM')">PM</button>
+                <button type="button" class="ampm-btn active" id="wake-am" onclick="App.setAmPm('wake', 'AM')">AM</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="sleep-duration">Total Duration (Hours)</label>
-          <input type="number" id="sleep-duration" class="form-input" value="8" step="0.1" min="1" max="24" required />
+        <!-- Calculated Sleep Duration Banner -->
+        <div class="sleep-duration-banner">
+          <span>Calculated Sleep Duration:</span>
+          <span class="sleep-duration-value" id="calc-sleep-duration-display">8 hrs 00 mins</span>
         </div>
 
         <div class="form-group">
@@ -479,15 +537,73 @@
           </select>
         </div>
 
+        <!-- User-Controlled Sleep & Lifestyle Factors -->
         <div class="form-group">
-          <label class="form-label">Sleep & Lifestyle Factors</label>
-          <div class="factor-tags">
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="exercised" style="display:none;" /> 🏋️ Exercised</label>
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="cool_room" style="display:none;" /> ❄️ Cool Room</label>
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="reading" style="display:none;" /> 📖 Read Book</label>
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="screen_time" style="display:none;" /> 📱 Late Screens</label>
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="caffeine_late" style="display:none;" /> ☕ Late Caffeine</label>
-            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="stress" style="display:none;" /> ⚡ High Stress</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label class="form-label" style="margin-bottom: 0;">Select Factors Affecting Your Sleep</label>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Click to toggle on / off</span>
+          </div>
+          
+          <div style="font-size: 0.72rem; font-weight: 700; color: #34d399; margin: 6px 0 6px 0; text-transform: uppercase;">
+            ✨ Sleep Enhancers (Positive)
+          </div>
+          <div class="factor-chips-grid">
+            <label class="factor-chip positive-factor" data-factor="exercised">
+              <input type="checkbox" class="factor-checkbox" value="exercised" />
+              <span class="chip-check">✓</span>
+              <span>🏋️ Exercised</span>
+            </label>
+            <label class="factor-chip positive-factor" data-factor="cool_room">
+              <input type="checkbox" class="factor-checkbox" value="cool_room" />
+              <span class="chip-check">✓</span>
+              <span>❄️ Cool Bedroom</span>
+            </label>
+            <label class="factor-chip positive-factor" data-factor="reading">
+              <input type="checkbox" class="factor-checkbox" value="reading" />
+              <span class="chip-check">✓</span>
+              <span>📖 Read / Wind-down</span>
+            </label>
+            <label class="factor-chip positive-factor" data-factor="meditation">
+              <input type="checkbox" class="factor-checkbox" value="meditation" />
+              <span class="chip-check">✓</span>
+              <span>🧘 Meditation</span>
+            </label>
+            <label class="factor-chip positive-factor" data-factor="consistent_time">
+              <input type="checkbox" class="factor-checkbox" value="consistent_time" />
+              <span class="chip-check">✓</span>
+              <span>⏰ On-time Bed</span>
+            </label>
+          </div>
+
+          <div style="font-size: 0.72rem; font-weight: 700; color: #fb7185; margin: 12px 0 6px 0; text-transform: uppercase;">
+            ⚡ Sleep Disruptors (Negative)
+          </div>
+          <div class="factor-chips-grid">
+            <label class="factor-chip negative-factor" data-factor="screen_time">
+              <input type="checkbox" class="factor-checkbox" value="screen_time" />
+              <span class="chip-check">✓</span>
+              <span>📱 Late Screen Time</span>
+            </label>
+            <label class="factor-chip negative-factor" data-factor="caffeine_late">
+              <input type="checkbox" class="factor-checkbox" value="caffeine_late" />
+              <span class="chip-check">✓</span>
+              <span>☕ Late Caffeine</span>
+            </label>
+            <label class="factor-chip negative-factor" data-factor="stress">
+              <input type="checkbox" class="factor-checkbox" value="stress" />
+              <span class="chip-check">✓</span>
+              <span>⚡ Stress / Racing Mind</span>
+            </label>
+            <label class="factor-chip negative-factor" data-factor="alcohol">
+              <input type="checkbox" class="factor-checkbox" value="alcohol" />
+              <span class="chip-check">✓</span>
+              <span>🍷 Alcohol</span>
+            </label>
+            <label class="factor-chip negative-factor" data-factor="heavy_meal">
+              <input type="checkbox" class="factor-checkbox" value="heavy_meal" />
+              <span class="chip-check">✓</span>
+              <span>🍕 Late Heavy Meal</span>
+            </label>
           </div>
         </div>
 

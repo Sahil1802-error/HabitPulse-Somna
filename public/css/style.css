@@ -587,7 +587,7 @@ body {
   border-radius: 50%;
 }
 
-/* Pill Tags (Factors) */
+/* Pill Tags (Factors Display) */
 .factor-tags {
   display: flex;
   flex-wrap: wrap;
@@ -615,6 +615,217 @@ body {
   background: rgba(244, 63, 94, 0.12);
   border-color: rgba(244, 63, 94, 0.3);
   color: var(--accent-rose);
+}
+
+/* Interactive Sleep Factor Chips */
+.factor-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.factor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.825rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.factor-chip:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.factor-chip input {
+  display: none;
+}
+
+.factor-chip .chip-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color);
+  font-size: 10px;
+  font-weight: 800;
+  color: transparent;
+  transition: all 0.2s ease;
+}
+
+.factor-chip.positive-factor.active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: var(--accent-emerald);
+  color: #34d399;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.25);
+}
+
+.factor-chip.positive-factor.active .chip-check {
+  background: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+  color: #ffffff;
+}
+
+.factor-chip.negative-factor.active {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: var(--accent-rose);
+  color: #fb7185;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.25);
+}
+
+.factor-chip.negative-factor.active .chip-check {
+  background: var(--accent-rose);
+  border-color: var(--accent-rose);
+  color: #ffffff;
+}
+
+/* Visually Appealing Clock Time Selector */
+.time-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 480px) {
+  .time-picker-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.time-picker-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s ease;
+}
+
+.time-picker-card:focus-within {
+  border-color: var(--accent-indigo);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.time-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.time-picker-header span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.time-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.time-select-unit {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 1.35rem;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  min-width: 58px;
+}
+
+.time-select-unit:focus {
+  border-color: var(--accent-indigo);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.time-select-unit option {
+  background: #111827;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.time-colon {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.ampm-toggle-group {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-left: 6px;
+}
+
+.ampm-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.ampm-btn.active {
+  background: var(--accent-indigo);
+  color: #ffffff;
+}
+
+/* Sleep Duration Pill Banner */
+.sleep-duration-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sleep-duration-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
 }
 
 /* Weekly Matrix Table */
