@@ -1,35 +1,9 @@
 {
-  "version": 2,
-  "public": true,
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/habits",
-      "destination": "/api/habits.js"
-    },
-    {
-      "source": "/api/habit-toggle",
-      "destination": "/api/habit-toggle.js"
-    },
-    {
-      "source": "/api/sleep",
-      "destination": "/api/sleep.js"
-    },
-    {
-      "source": "/api/analytics",
-      "destination": "/api/analytics.js"
-    },
-    {
-      "source": "/api/insights",
-      "destination": "/api/insights.js"
-    },
-    {
-      "source": "/api/seed",
-      "destination": "/api/seed.js"
-    },
-    {
-      "source": "/api/backup",
-      "destination": "/api/backup.js"
+      "source": "/",
+      "destination": "/public/index.html"
     },
     {
       "source": "/((?!api/).*)",
