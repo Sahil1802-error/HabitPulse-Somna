@@ -13,6 +13,7 @@ module.exports = function handler(req, res) {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const action = url.searchParams.get('action') || (req.body && req.body.action);
 
+    // 1. Sign Up
     if (action === 'signup' && req.method === 'POST') {
       const { name, email, password } = req.body || {};
       if (!name || !email || !password) {
@@ -25,6 +26,7 @@ module.exports = function handler(req, res) {
       return res.status(201).json({ success: true, ...result });
     }
 
+    // 2. Login
     if (action === 'login' && req.method === 'POST') {
       const { email, password } = req.body || {};
       if (!email || !password) {
@@ -34,6 +36,7 @@ module.exports = function handler(req, res) {
       return res.status(200).json({ success: true, ...result });
     }
 
+    // 3. Current User Profile
     if (action === 'me' && req.method === 'GET') {
       const userId = db.getUserIdFromRequest(req);
       if (!userId || userId === 'u-demo') {
@@ -41,11 +44,32 @@ module.exports = function handler(req, res) {
       }
       const user = db.getUserById(userId);
       if (!user) {
-        return res.status(404).json({ success: false, error: 'User not found.' });
+        return res.status(404).json({ success: false, error: 'User not found on active server instance.' });
       }
       return res.status(200).json({ success: true, user });
     }
 
+    // 4. Restore Account (Resilient recovery for serverless cold starts)
+    if (action === 'restore_account' && req.method === 'POST') {
+      const { name, email, password, data } = req.body || {};
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: 'Email and password required for recovery.' });
+      }
+      const result = db.restoreOrRegisterUser(name || 'User', email, password, data);
+      return res.status(200).json({ success: true, ...result });
+    }
+
+    // 5. Restore Session (Silent recovery when opening browser)
+    if (action === 'restore_session' && req.method === 'POST') {
+      const { userId, name, email, data } = req.body || {};
+      if (!userId || !email) {
+        return res.status(400).json({ success: false, error: 'userId and email required.' });
+      }
+      const result = db.restoreSession(userId, name, email, data);
+      return res.status(200).json({ success: true, ...result });
+    }
+
+    // 6. Sync User Data
     if (action === 'sync' && req.method === 'POST') {
       const userId = db.getUserIdFromRequest(req);
       const data = db.syncUserData(userId, req.body);

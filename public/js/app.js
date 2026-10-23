@@ -166,6 +166,16 @@ const App = {
     } catch (e) {}
   },
 
+  async triggerUserBackup() {
+    if (!this.currentUser) return;
+    try {
+      const res = await API.exportBackup();
+      if (res && res.data) {
+        this.backupUserLocalData(res.data);
+      }
+    } catch (e) {}
+  },
+
   async syncLocalToCloud() {
     if (!this.currentUser) return;
     try {
@@ -616,6 +626,7 @@ const App = {
         this.showToast('Habit completed! Keep the streak alive 🔥', 'success');
       }
       this.loadCurrentView();
+      this.triggerUserBackup();
     } catch (err) {
       this.showToast('Could not toggle habit', 'error');
     }
@@ -635,6 +646,7 @@ const App = {
       e.target.reset();
       this.showToast('New habit created!', 'success');
       this.loadCurrentView();
+      this.triggerUserBackup();
     } catch (err) {
       this.showToast('Error creating habit', 'error');
     }
@@ -648,6 +660,7 @@ const App = {
       await API.deleteHabit(habitId);
       this.showToast('Habit deleted', 'info');
       this.loadCurrentView();
+      this.triggerUserBackup();
     } catch (err) {
       this.showToast('Error deleting habit', 'error');
     }
@@ -843,6 +856,7 @@ const App = {
       this.closeModal('sleep-modal');
       this.showToast('Sleep log recorded successfully!', 'success');
       this.loadCurrentView();
+      this.triggerUserBackup();
     } catch (err) {
       this.showToast('Error saving sleep log', 'error');
     }

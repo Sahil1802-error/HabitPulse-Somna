@@ -3,9 +3,11 @@
 // Local Development, and Vercel Serverless Function Deployment
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 
 const DB_PATH = path.join(process.cwd(), 'data', 'database.json');
+const TMP_DB_PATH = path.join(os.tmpdir(), 'somna_database.json');
 const AUTH_SECRET = process.env.AUTH_SECRET || 'somna-habitpulse-secure-secret-key-2026';
 
 let memoryDb = null;
@@ -365,20 +367,31 @@ function getDatabase() {
     return memoryDb;
   }
 
+  // 1. Try reading from TMP_DB_PATH (writable persistent storage on Vercel)
+  try {
+    if (fs.existsSync(TMP_DB_PATH)) {
+      const content = fs.readFileSync(TMP_DB_PATH, 'utf-8');
+      memoryDb = JSON.parse(content);
+      if (!memoryDb.users) memoryDb.users = [];
+      return memoryDb;
+    }
+  } catch (err) {
+    // Ignore and fallback
+  }
+
+  // 2. Try reading from DB_PATH (local file or bundled deployment file)
   try {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, 'utf-8');
       memoryDb = JSON.parse(content);
-      // Ensure users array exists
-      if (!memoryDb.users) {
-        memoryDb.users = [];
-      }
+      if (!memoryDb.users) memoryDb.users = [];
       return memoryDb;
     }
   } catch (err) {
     console.warn("Could not read database from disk, using fallback:", err.message);
   }
 
+  // 3. Fallback to default template
   memoryDb = getDefaultData();
   saveDatabase(memoryDb);
   return memoryDb;
@@ -387,6 +400,8 @@ function getDatabase() {
 function saveDatabase(data) {
   memoryDb = data;
   data.lastUpdated = new Date().toISOString();
+
+  // Try writing to primary DB_PATH (local development)
   try {
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) {
@@ -394,7 +409,14 @@ function saveDatabase(data) {
     }
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.warn("Write to disk not allowed (serverless read-only filesystem), keeping in-memory state:", err.message);
+    // Expected on read-only serverless filesystems
+  }
+
+  // Always write to TMP_DB_PATH (guaranteed writable on Vercel)
+  try {
+    fs.writeFileSync(TMP_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn("Could not write to TMP_DB_PATH:", err.message);
   }
 }
 
@@ -465,6 +487,86 @@ function getUserById(userId) {
   const user = (db.users || []).find(u => u.id === userId);
   if (!user) return null;
   return { id: user.id, name: user.name, email: user.email };
+}
+
+function restoreOrRegisterUser(name, email, password, userData) {
+  const db = getDatabase();
+  db.users = db.users || [];
+
+  const cleanEmail = email.trim().toLowerCase();
+  let user = db.users.find(u => u.email.toLowerCase() === cleanEmail);
+
+  if (user) {
+    if (user.passwordHash && user.salt) {
+      const valid = verifyPassword(password, user.passwordHash, user.salt);
+      if (!valid) {
+        throw new Error('Incorrect password for this account.');
+      }
+    }
+  } else {
+    const { hash, salt } = hashPassword(password);
+    const userId = `u-${generateId()}`;
+    user = {
+      id: userId,
+      name: name ? name.trim() : 'User',
+      email: cleanEmail,
+      passwordHash: hash,
+      salt,
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(user);
+
+    const starterHabits = getStarterHabitsForUser(userId);
+    db.habits = db.habits || [];
+    db.habits.push(...starterHabits);
+  }
+
+  if (userData) {
+    syncUserData(user.id, userData);
+  } else {
+    saveDatabase(db);
+  }
+
+  const token = createToken(user.id);
+  return {
+    user: { id: user.id, name: user.name, email: user.email },
+    token
+  };
+}
+
+function restoreSession(userId, name, email, userData) {
+  const db = getDatabase();
+  db.users = db.users || [];
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+  let user = db.users.find(u => u.id === userId || (cleanEmail && u.email.toLowerCase() === cleanEmail));
+
+  if (!user) {
+    user = {
+      id: userId,
+      name: name || 'User',
+      email: cleanEmail,
+      passwordHash: '',
+      salt: '',
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(user);
+    const starterHabits = getStarterHabitsForUser(userId);
+    db.habits = db.habits || [];
+    db.habits.push(...starterHabits);
+  }
+
+  if (userData) {
+    syncUserData(user.id, userData);
+  } else {
+    saveDatabase(db);
+  }
+
+  const token = createToken(user.id);
+  return {
+    user: { id: user.id, name: user.name, email: user.email },
+    token
+  };
 }
 
 // ----------------- Per-User CRUD Operations -----------------
@@ -1083,5 +1185,7 @@ module.exports = {
   getMonthlyAnalytics,
   getInsightsAndCorrelations,
   getUserData,
-  syncUserData
+  syncUserData,
+  restoreOrRegisterUser,
+  restoreSession
 };

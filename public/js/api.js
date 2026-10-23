@@ -1,4 +1,4 @@
-// API Client with User Authentication and Local/Cloud Sync
+// API Client with Resilient User Authentication and Client-Side Vault
 const API = {
   baseUrl: '',
 
@@ -17,12 +17,56 @@ const API = {
 
   setAuth(token, user) {
     if (token) localStorage.setItem('hs_auth_token', token);
-    if (user) localStorage.setItem('hs_user', JSON.stringify(user));
+    if (user) {
+      localStorage.setItem('hs_user', JSON.stringify(user));
+      this.recordInVault(user);
+    }
   },
 
   clearAuth() {
     localStorage.removeItem('hs_auth_token');
     localStorage.removeItem('hs_user');
+  },
+
+  // Record user account metadata in local device vault
+  recordInVault(user) {
+    if (!user || !user.email) return;
+    try {
+      const vault = JSON.parse(localStorage.getItem('hs_vault_accounts') || '[]');
+      const cleanEmail = user.email.toLowerCase().trim();
+      const existingIdx = vault.findIndex(u => u.email.toLowerCase() === cleanEmail);
+      const entry = {
+        id: user.id,
+        name: user.name || 'User',
+        email: cleanEmail,
+        lastSeen: new Date().toISOString()
+      };
+      if (existingIdx !== -1) {
+        vault[existingIdx] = { ...vault[existingIdx], ...entry };
+      } else {
+        vault.push(entry);
+      }
+      localStorage.setItem('hs_vault_accounts', JSON.stringify(vault));
+    } catch (e) {}
+  },
+
+  findInVault(email) {
+    try {
+      const vault = JSON.parse(localStorage.getItem('hs_vault_accounts') || '[]');
+      const cleanEmail = (email || '').toLowerCase().trim();
+      return vault.find(u => u.email.toLowerCase() === cleanEmail) || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getCachedUserData(userId) {
+    try {
+      const raw = localStorage.getItem(`hs_user_data_${userId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
   },
 
   async request(endpoint, options = {}) {
@@ -64,29 +108,80 @@ const API = {
   },
 
   async login(email, password) {
-    const res = await this.request('/api/auth?action=login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    if (res.token && res.user) {
-      this.setAuth(res.token, res.user);
+    try {
+      // 1. First attempt: standard server login
+      const res = await this.request('/api/auth?action=login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      if (res.token && res.user) {
+        this.setAuth(res.token, res.user);
+      }
+      return res;
+    } catch (err) {
+      // 2. Fallback: If server restarted / cold-started and forgot the user account in memory
+      const vaultUser = this.findInVault(email);
+      if (vaultUser) {
+        const cachedData = this.getCachedUserData(vaultUser.id);
+        try {
+          const recoveryRes = await this.request('/api/auth?action=restore_account', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: vaultUser.name,
+              email: vaultUser.email,
+              password,
+              data: cachedData
+            })
+          });
+          if (recoveryRes.token && recoveryRes.user) {
+            this.setAuth(recoveryRes.token, recoveryRes.user);
+            return recoveryRes;
+          }
+        } catch (recoverErr) {
+          throw new Error(recoverErr.message || 'Invalid email or password.');
+        }
+      }
+      throw err;
     }
-    return res;
   },
 
   async getMe() {
     const token = this.getToken();
-    if (!token) return null;
+    const cachedUser = this.getUser();
+    if (!token && !cachedUser) return null;
+
     try {
       const res = await this.request('/api/auth?action=me');
       if (res.user) {
         this.setAuth(token, res.user);
+        return res.user;
       }
-      return res.user;
     } catch (e) {
-      this.clearAuth();
-      return null;
+      // If server cold-started, attempt silent session restoration using local vault
+      if (cachedUser && cachedUser.id) {
+        try {
+          const cachedData = this.getCachedUserData(cachedUser.id);
+          const restoreRes = await this.request('/api/auth?action=restore_session', {
+            method: 'POST',
+            body: JSON.stringify({
+              userId: cachedUser.id,
+              name: cachedUser.name,
+              email: cachedUser.email,
+              data: cachedData
+            })
+          });
+          if (restoreRes.token && restoreRes.user) {
+            this.setAuth(restoreRes.token, restoreRes.user);
+            return restoreRes.user;
+          }
+        } catch (restoreErr) {
+          console.warn('Session restore failed:', restoreErr.message);
+        }
+      }
+      // If token expired and restore failed, return cached user for offline viewing
+      return cachedUser || null;
     }
+    return null;
   },
 
   logout() {
