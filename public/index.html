@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HabitPulse & Somna — Habit & Sleep Tracking & Analytics</title>
+  <meta name="description" content="Comprehensive Habit and Sleep Analytics dashboard for daily, weekly, and monthly tracking with smart correlations and circadian insights." />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌙</text></svg>">
+</head>
+<body>
+  <!-- Canvas for celebration confetti -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <h1 class="brand-title">HabitPulse <span style="font-weight: 400; opacity: 0.7;">& Somna</span></h1>
+          <p class="brand-subtitle">Habit & Sleep Tracking • Daily, Weekly & Monthly Analytics</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-add-habit" class="btn btn-primary" title="Add New Habit">
+          <span>＋</span> Add Habit
+        </button>
+        <button id="btn-log-sleep" class="btn btn-sleep" title="Log Sleep Session">
+          <span>🌙</span> Log Sleep
+        </button>
+        <button id="btn-data-options" class="btn btn-secondary" title="Data Management">
+          <span>⚙️</span> Data
+        </button>
+        <button id="theme-toggle-btn" class="btn-icon" title="Toggle Theme" aria-label="Toggle Dark/Light Mode">
+          ☀️
+        </button>
+      </div>
+    </header>
+
+    <!-- Controls: View Tabs & Date Selector -->
+    <nav class="control-bar" aria-label="Dashboard controls">
+      <div class="view-pills" role="tablist">
+        <button class="view-pill active" data-view="daily" role="tab" aria-selected="true">
+          <span>📅</span> Daily
+        </button>
+        <button class="view-pill" data-view="weekly" role="tab" aria-selected="false">
+          <span>📊</span> Weekly
+        </button>
+        <button class="view-pill" data-view="monthly" role="tab" aria-selected="false">
+          <span>🗓️</span> Monthly
+        </button>
+        <button class="view-pill" data-view="insights" role="tab" aria-selected="false">
+          <span>✨</span> Insights & Impact
+        </button>
+      </div>
+
+      <div class="date-controls">
+        <button id="date-prev-btn" class="btn-icon" style="width: 32px; height: 32px;" title="Previous" aria-label="Previous">◀</button>
+        <span id="date-display-text" class="date-display">Loading date...</span>
+        <button id="date-next-btn" class="btn-icon" style="width: 32px; height: 32px;" title="Next" aria-label="Next">▶</button>
+        <input type="date" id="date-picker-input" class="date-input" aria-label="Select Date" />
+        <button id="date-today-btn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Today</button>
+      </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main>
+      <!-- ================= 1. DAILY VIEW ================= -->
+      <section id="daily-view">
+        <!-- Daily Top Stat Cards -->
+        <div class="stats-grid">
+          <!-- Daily Score -->
+          <div class="stat-card">
+            <div id="daily-score-gauge"></div>
+            <div class="stat-info">
+              <div class="stat-label">Daily Balance Score</div>
+              <div class="stat-value">Optimal</div>
+              <div class="stat-subtext">50% Habits + 50% Sleep quality</div>
+            </div>
+          </div>
+
+          <!-- Habit Gauge -->
+          <div class="stat-card">
+            <div id="daily-habit-gauge"></div>
+            <div class="stat-info">
+              <div class="stat-label">Habits Today</div>
+              <div id="stat-habits-done" class="stat-value">0 / 0</div>
+              <div id="stat-habit-rate" class="stat-subtext">0% completed</div>
+            </div>
+          </div>
+
+          <!-- Sleep Duration & Quality -->
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">🌙</div>
+            <div class="stat-info">
+              <div class="stat-label">Last Night's Sleep</div>
+              <div id="stat-sleep-duration" class="stat-value">—</div>
+              <div id="stat-sleep-quality" class="stat-subtext">—</div>
+            </div>
+          </div>
+
+          <!-- Active Streaks -->
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">🔥</div>
+            <div class="stat-info">
+              <div class="stat-label">Streak Status</div>
+              <div class="stat-value">On Fire</div>
+              <div class="stat-subtext">Consistency builds compounding results</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily 2-Column Section -->
+        <div class="dashboard-grid dashboard-grid-2col">
+          <!-- Left: Today's Habit Checklist -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🎯</span> Today's Habit Checklist
+              </h2>
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="App.openModal('habit-modal')">
+                ＋ Add
+              </button>
+            </div>
+            <div id="daily-habit-list" class="habit-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Right: Sleep Architecture & Coaching Tip -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- Sleep Card -->
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">
+                  <span>💤</span> Sleep Architecture & Stages
+                </h2>
+                <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="App.openModal('sleep-modal')">
+                  Edit Log
+                </button>
+              </div>
+
+              <!-- Visual Stage Bar -->
+              <div id="daily-sleep-stages" class="sleep-stage-bar"></div>
+
+              <div class="sleep-legend">
+                <div class="legend-item">
+                  <div class="legend-dot" style="background: #6366f1;"></div>
+                  <span>Deep Sleep</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot" style="background: #06b6d4;"></div>
+                  <span>REM Sleep</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot" style="background: #a5b4fc;"></div>
+                  <span>Light Sleep</span>
+                </div>
+              </div>
+
+              <!-- Sleep Factors Tags -->
+              <div style="margin-top: 18px;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 6px;">RECORDED FACTORS</div>
+                <div id="daily-sleep-factors" class="factor-tags"></div>
+              </div>
+
+              <!-- Sleep Notes -->
+              <div style="margin-top: 16px; font-size: 0.85rem; color: var(--text-secondary); background: rgba(255,255,255,0.03); padding: 12px; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-indigo);">
+                <span id="daily-sleep-notes">Bedtime and wake time details</span>
+              </div>
+            </div>
+
+            <!-- Daily Smart Coach Tip -->
+            <div class="card" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(6, 182, 212, 0.08) 100%); border-color: rgba(99, 102, 241, 0.3);">
+              <h3 style="font-size: 0.95rem; font-weight: 700; color: #a5b4fc; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span>💡</span> Circadian Health Tip
+              </h3>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5;">
+                Getting 15–20 minutes of bright outdoor light within 1 hour of waking anchors your suprachiasmatic nucleus (circadian clock), increasing melatonin onset 14 hours later for deeper stage 3 slow-wave sleep.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 2. WEEKLY VIEW ================= -->
+      <section id="weekly-view" style="display: none;">
+        <!-- Weekly Stat Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;">⏱️</div>
+            <div class="stat-info">
+              <div class="stat-label">Weekly Avg Sleep</div>
+              <div id="weekly-avg-sleep" class="stat-value">0h</div>
+              <div class="stat-subtext">Target: 8.0 hours / night</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">⭐</div>
+            <div class="stat-info">
+              <div class="stat-label">Weekly Sleep Quality</div>
+              <div id="weekly-avg-quality" class="stat-value">0%</div>
+              <div class="stat-subtext">Restorative sleep index</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e;">⚖️</div>
+            <div class="stat-info">
+              <div class="stat-label">Sleep Debt / Surplus</div>
+              <div id="weekly-sleep-debt" class="stat-value">0h</div>
+              <div class="stat-subtext">Based on 56h weekly baseline</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📈</div>
+            <div class="stat-info">
+              <div class="stat-label">Habit Consistency</div>
+              <div id="weekly-overall-habit-rate" class="stat-value">0%</div>
+              <div class="stat-subtext">Across all active habits</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Charts: Duration & Trends -->
+        <div class="dashboard-grid dashboard-grid-2col">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>📊</span> 7-Day Sleep Duration vs 8h Target
+              </h2>
+            </div>
+            <div id="weekly-sleep-chart-container" style="min-height: 220px;"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>📉</span> Sleep Quality vs Habit Consistency
+              </h2>
+            </div>
+            <div id="weekly-trend-chart-container" style="min-height: 220px;"></div>
+          </div>
+        </div>
+
+        <!-- Weekly Matrix -->
+        <div class="card" style="margin-top: 24px;">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span>📅</span> Weekly Habit Adherence Matrix
+            </h2>
+          </div>
+          <div id="weekly-matrix-container"></div>
+        </div>
+      </section>
+
+      <!-- ================= 3. MONTHLY VIEW ================= -->
+      <section id="monthly-view" style="display: none;">
+        <!-- Monthly Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">🌙</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Hours Slept</div>
+              <div id="monthly-total-sleep" class="stat-value">0h</div>
+              <div class="stat-subtext">Logged this month</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;">⭐</div>
+            <div class="stat-info">
+              <div class="stat-label">Monthly Sleep Quality</div>
+              <div id="monthly-avg-quality" class="stat-value">0%</div>
+              <div class="stat-subtext">Average sleep rating</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">✅</div>
+            <div class="stat-info">
+              <div class="stat-label">Habits Completed</div>
+              <div id="monthly-total-habits-checked" class="stat-value">0</div>
+              <div class="stat-subtext">Individual achievements</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">🎯</div>
+            <div class="stat-info">
+              <div class="stat-label">Monthly Adherence</div>
+              <div id="monthly-habit-rate" class="stat-value">0%</div>
+              <div class="stat-subtext">Completion percentage</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid dashboard-grid-2col">
+          <!-- Calendar Heatmap -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🗓️</span> Monthly Consistency Heatmap
+              </h2>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">
+                Click any day to jump to its log
+              </div>
+            </div>
+            <div id="monthly-calendar-container"></div>
+          </div>
+
+          <!-- Category Distribution -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>📂</span> Habit Completion by Category
+              </h2>
+            </div>
+            <div id="monthly-category-container"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 4. INSIGHTS VIEW ================= -->
+      <section id="insights-view" style="display: none;">
+        <div class="dashboard-grid dashboard-grid-2col">
+          <!-- Habit Impact on Sleep -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🔬</span> How Your Habits Impact Sleep Quality
+              </h2>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+              Correlation analysis measuring the difference in sleep quality score on days you complete each habit vs days you skip.
+            </p>
+            <div id="insights-correlations"></div>
+          </div>
+
+          <!-- Chronotype & Recommendations -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- Chronotype / Social Jetlag -->
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">
+                  <span>⏰</span> Chronotype & Schedule Consistency
+                </h2>
+              </div>
+              <div id="insights-chronotype"></div>
+            </div>
+
+            <!-- Smart Actionable Tips -->
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                <span>✨</span> Personalized Recommendations
+              </h3>
+              <div id="insights-recommendations"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. Add Habit Modal -->
+  <div id="habit-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="habit-modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="habit-modal-title" class="modal-title">＋ Create New Habit</h3>
+        <button class="modal-close" onclick="App.closeModal('habit-modal')" aria-label="Close modal">×</button>
+      </div>
+      <form id="habit-form">
+        <div class="form-group">
+          <label class="form-label" for="habit-title-input">Habit Title</label>
+          <input type="text" id="habit-title-input" class="form-input" placeholder="e.g., Cold Shower, 20m Yoga, Read Book" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="habit-category-input">Category</label>
+            <select id="habit-category-input" class="form-select">
+              <option value="Health">Health</option>
+              <option value="Fitness">Fitness</option>
+              <option value="Mindfulness">Mindfulness</option>
+              <option value="Learning">Learning</option>
+              <option value="Sleep">Sleep</option>
+              <option value="Productivity">Productivity</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="habit-icon-input">Emoji Icon</label>
+            <input type="text" id="habit-icon-input" class="form-input" value="🎯" maxlength="4" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="habit-target-input">Target Value</label>
+            <input type="number" id="habit-target-input" class="form-input" value="1" min="1" step="any" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="habit-unit-input">Unit</label>
+            <input type="text" id="habit-unit-input" class="form-input" value="times" placeholder="e.g. min, pages, L, times" />
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="App.closeModal('habit-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Habit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Log Sleep Modal -->
+  <div id="sleep-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="sleep-modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="sleep-modal-title" class="modal-title">🌙 Log Sleep Session</h3>
+        <button class="modal-close" onclick="App.closeModal('sleep-modal')" aria-label="Close modal">×</button>
+      </div>
+      <form id="sleep-form">
+        <div class="form-group">
+          <label class="form-label" for="sleep-date-input">Sleep Date</label>
+          <input type="date" id="sleep-date-input" class="form-input" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="sleep-bedtime">Bedtime</label>
+            <input type="time" id="sleep-bedtime" class="form-input" value="23:00" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="sleep-waketime">Wake Time</label>
+            <input type="time" id="sleep-waketime" class="form-input" value="07:00" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sleep-duration">Total Duration (Hours)</label>
+          <input type="number" id="sleep-duration" class="form-input" value="8" step="0.1" min="1" max="24" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sleep-quality-range">Sleep Quality Score</label>
+          <div class="slider-container">
+            <input type="range" id="sleep-quality-range" class="form-range" min="1" max="100" value="85" />
+            <span id="quality-val-display" class="range-val">85%</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sleep-mood">Mood Upon Waking</label>
+          <select id="sleep-mood" class="form-select">
+            <option value="energized">⚡ Energized</option>
+            <option value="refreshed" selected>✨ Refreshed</option>
+            <option value="normal">😐 Normal</option>
+            <option value="tired">🥱 Tired</option>
+            <option value="groggy">😴 Groggy</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sleep & Lifestyle Factors</label>
+          <div class="factor-tags">
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="exercised" style="display:none;" /> 🏋️ Exercised</label>
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="cool_room" style="display:none;" /> ❄️ Cool Room</label>
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="reading" style="display:none;" /> 📖 Read Book</label>
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="screen_time" style="display:none;" /> 📱 Late Screens</label>
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="caffeine_late" style="display:none;" /> ☕ Late Caffeine</label>
+            <label class="factor-tag factor-select-tag"><input type="checkbox" class="factor-checkbox" value="stress" style="display:none;" /> ⚡ High Stress</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sleep-notes">Personal Notes</label>
+          <textarea id="sleep-notes" class="form-textarea" rows="2" placeholder="Dream recall, awakenings, thoughts..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+          <button type="button" class="btn btn-secondary" onclick="App.closeModal('sleep-modal')">Cancel</button>
+          <button type="submit" class="btn btn-sleep">Save Sleep Log</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Data & Backup Modal -->
+  <div id="data-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="data-modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="data-modal-title" class="modal-title">⚙️ Data & Backup Management</h3>
+        <button class="modal-close" onclick="App.closeModal('data-modal')" aria-label="Close modal">×</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px;">Seed 35 Days of Realistic History</strong>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            Pre-fills streaks, weekly habits matrix, 35-day sleep records, and correlation metrics.
+          </p>
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="App.seedDemoData()">
+            🌱 Pre-fill Realistic Demo Data
+          </button>
+        </div>
+
+        <div style="padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px;">Export & Backup Database</strong>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            Download complete JSON backup file containing all your custom habits, logs, and sleep entries.
+          </p>
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="App.exportData()">
+            📥 Export Backup (JSON)
+          </button>
+        </div>
+
+        <div style="padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+          <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px;">Restore From Backup</strong>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            Upload a previously exported JSON backup file.
+          </p>
+          <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="App.handleFileImport(event)" />
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="App.triggerFileInput()">
+            📤 Import Backup File
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="/js/charts.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

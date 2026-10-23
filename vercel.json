@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "public": true,
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/habits",
+      "destination": "/api/habits.js"
+    },
+    {
+      "source": "/api/habit-toggle",
+      "destination": "/api/habit-toggle.js"
+    },
+    {
+      "source": "/api/sleep",
+      "destination": "/api/sleep.js"
+    },
+    {
+      "source": "/api/analytics",
+      "destination": "/api/analytics.js"
+    },
+    {
+      "source": "/api/insights",
+      "destination": "/api/insights.js"
+    },
+    {
+      "source": "/api/seed",
+      "destination": "/api/seed.js"
+    },
+    {
+      "source": "/api/backup",
+      "destination": "/api/backup.js"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/public/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+      ]
+    }
+  ]
+}

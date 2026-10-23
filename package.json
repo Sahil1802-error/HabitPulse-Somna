@@ -1,0 +1,22 @@
+{
+  "name": "habit-sleep-tracker",
+  "version": "1.0.0",
+  "description": "Comprehensive Habit & Sleep Tracking and Analytics Web Application (Daily, Weekly, Monthly)",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "seed": "node -e \"require('./api/_db.js').saveDatabase(require('./api/_db.js').getDefaultData())\""
+  },
+  "keywords": [
+    "habit-tracker",
+    "sleep-tracker",
+    "analytics",
+    "vercel",
+    "dashboard",
+    "health"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
